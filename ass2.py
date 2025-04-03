@@ -43,7 +43,7 @@ def matrix_vector_mult(vector, matrix):
             result[i] += vector[j] * matrix[j][i]  # Matrix [j][i] because input vector pi is a row vector
     return result
 
-def compute_stationary_distribution(Q, tolerance=1e-6, max_iterations=100000, delta_t=0.01):
+def compute_stationary_distribution(Q, tolerance=1e-6, max_iterations=10000, delta_t=0.01):
     """
     Computes the stationary distribution using an iterative Euler method.
     """
@@ -68,14 +68,25 @@ def compute_stationary_distribution(Q, tolerance=1e-6, max_iterations=100000, de
     return pi
 
 def compute_uptime_probability(pi, k):
+    """
+    Computes the probability that the system is operational, 
+    given a stationary distribution and the number of working components that are required for the system to function
+    """
     return sum(pi[k:])
 
 def compute_downtime_cost(pi, k, cost_downtime):
+    """
+    Computes the costs that are related to the total downtime of the system
+    """
     downtime_cost = sum(pi[i] * cost_downtime for i in range(k))
     
     return downtime_cost
 
 def total_cost(n, k, failure_rate, repair_rate, repairman, warm_standby, cost_component, cost_repairman, cost_downtime):
+    """
+    Computes the total cost of a system for a given input combination
+    """
+    
     # Create transition matrix
     transition_matrix = create_transition_matrix(n, k, failure_rate, repair_rate, repairman, warm_standby)
     
@@ -95,6 +106,11 @@ def total_cost(n, k, failure_rate, repair_rate, repairman, warm_standby, cost_co
     return component_cost + repairman_cost + downtime_cost
 
 def find_optimal_parameters(failure_rate, repair_rate, k, warm_standby, cost_component, cost_repairman, cost_downtime, n_range, repairman_range):
+    """
+    This function find the optimal number of components and the number of repairman to minimze the total costs,
+    given the number of working components that are required for the system to function
+    """
+    
     optimal_cost = float('inf')
     optimal_n = 0
     optimal_repairman = 0
@@ -111,6 +127,10 @@ def find_optimal_parameters(failure_rate, repair_rate, k, warm_standby, cost_com
     return optimal_n, optimal_repairman, optimal_cost
 
 def main():
+    """
+    This method defines the interface provided by Streamlit
+    """
+    
     # Initialize screen state if not already initialized
     if "screen" not in st.session_state:
         st.session_state.screen = "home"  # Default screen is the home screen
@@ -176,14 +196,33 @@ def main():
 
         if st.button("Find Optimal Parameters"):
             # Compute optimal parameters
-            n_range = range(1, 25)
-            repairman_range = range(1, 25)
+            max_components = 5
+            max_repairmen = 5
 
-            optimal_n, optimal_repairman, optimal_cost = find_optimal_parameters(
-                failure_rate, repair_rate, k, warm_standby,
-                cost_component, cost_repairman, cost_downtime, n_range, repairman_range)
+            n_range = range(k, k + max_components + 1)  # Range of possible component counts
+            repairman_range = range(1, max_repairmen + 1)  # Range of possible repairmen counts
+
+            optimal_n, optimal_repairman, optimal_cost = find_optimal_parameters(failure_rate, repair_rate, 
+                                                                                 k, warm_standby, cost_component, cost_repairman, cost_downtime, n_range, repairman_range)
+
+            old_n = 0
+            old_repairman = 0
+
+            while optimal_n == (k +  max_components) or optimal_repairman == max_repairmen:
+                if optimal_n == old_n and optimal_repairman == old_repairman:
+                    break
+
+                old_n = optimal_n
+                old_repairman = optimal_repairman
+
+                max_components += 5
+                max_repairmen += 5
+                optimal_n, optimal_repairman, optimal_cost = find_optimal_parameters(failure_rate, repair_rate, k, 
+                                                                                     warm_standby, cost_component, cost_repairman, cost_downtime, 
+                                                                                     range(max(k, optimal_n - 5), k + max_components + 1), 
+                                                                                     range(max(1, optimal_repairman - 5), max_repairmen + 1))
             
-            optimal_cost = round(optimal_cost , 2)
+            optimal_cost = round(optimal_cost, 2)
             
             st.subheader("Optimal Parameters")
             st.write(f"Number of components (n): {optimal_n}")
